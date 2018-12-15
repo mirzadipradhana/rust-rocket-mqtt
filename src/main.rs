@@ -8,6 +8,11 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
+
+use std::env;
 
 use rocket_contrib::json::{Json, JsonValue};
 
@@ -34,6 +39,13 @@ fn heroes() -> Json<Hero> {
 }
 
 fn main() {
+  env::set_var(
+    "RUST_LOG",
+    env::var_os("RUST_LOG").unwrap_or_else(|| "info".into()),
+  );
+  env_logger::init();
+
+  info!("Hai from log");
   rocket::ignite()
     .mount("/", routes![hello])
     .mount("/heroes", routes![heroes])
