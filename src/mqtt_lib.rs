@@ -1,17 +1,12 @@
 extern crate mqtt;
 
-use std::env;
-use std::fmt::Debug;
-use std::fs::File;
 use std::io::Write;
 use std::net;
-use std::str;
 
 use mqtt::control::variable_header::ConnectReturnCode;
 use mqtt::packet::*;
-use mqtt::topic_filter::TopicFilter;
 use mqtt::TopicName;
-use mqtt::{Decodable, Encodable, QualityOfService};
+use mqtt::{Decodable, Encodable};
 
 const KEEP_ALIVE: u16 = 10;
 

@@ -2,7 +2,6 @@
 
 #[macro_use]
 extern crate rocket;
-#[macro_use]
 extern crate rocket_contrib;
 extern crate serde;
 extern crate serde_json;
@@ -21,12 +20,7 @@ mod mqtt_lib;
 use std::env;
 use std::fs::File;
 
-use rocket_contrib::json::{Json, JsonValue};
-
-use mqtt::control::variable_header::ConnectReturnCode;
-use mqtt::packet::*;
-use mqtt::topic_filter::TopicFilter;
-use mqtt::{Decodable, Encodable, QualityOfService};
+use rocket_contrib::json::Json;
 
 mod model;
 use model::hero::Hero;
