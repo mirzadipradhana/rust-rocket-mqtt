@@ -30,6 +30,11 @@ fn hello() -> &'static str {
   "Hello, world!"
 }
 
+#[get("/am-i-up")]
+fn am_i_up() -> &'static str {
+  "OK"
+}
+
 #[get("/")]
 fn heroes() -> Json<Hero> {
   let data = Hero {
@@ -70,6 +75,7 @@ fn main() {
   info!("Hai from log");
   rocket::ignite()
     .mount("/", routes![hello])
+    .mount("/status", routes![am_i_up])
     .mount("/heroes", routes![heroes])
     .launch();
 }
