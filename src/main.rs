@@ -11,10 +11,22 @@ extern crate serde_derive;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate mqtt;
+
+mod config;
+use config::read_config;
+
+mod mqtt_lib;
 
 use std::env;
+use std::fs::File;
 
 use rocket_contrib::json::{Json, JsonValue};
+
+use mqtt::control::variable_header::ConnectReturnCode;
+use mqtt::packet::*;
+use mqtt::topic_filter::TopicFilter;
+use mqtt::{Decodable, Encodable, QualityOfService};
 
 mod model;
 use model::hero::Hero;
@@ -44,6 +56,22 @@ fn main() {
     env::var_os("RUST_LOG").unwrap_or_else(|| "info".into()),
   );
   env_logger::init();
+
+  const CONFIG_FILENAME: &'static str = "config.toml";
+  let mut f = File::open(CONFIG_FILENAME).expect(&format!(
+    "Can't open configuration file: {}",
+    CONFIG_FILENAME
+  ));
+  let settings = read_config(&mut f).expect("Can't read configuration file.");
+
+  let mut stream = mqtt_lib::connect(
+    settings.mqtt.broker_address,
+    settings.mqtt.username,
+    settings.mqtt.password,
+    settings.mqtt.client_id,
+  );
+
+  mqtt_lib::publish(&mut stream, "Hai".to_string(), settings.mqtt.topic);
 
   info!("Hai from log");
   rocket::ignite()
