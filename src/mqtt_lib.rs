@@ -5,8 +5,9 @@ use std::net;
 
 use mqtt::control::variable_header::ConnectReturnCode;
 use mqtt::packet::*;
+use mqtt::topic_filter::TopicFilter;
 use mqtt::TopicName;
-use mqtt::{Decodable, Encodable};
+use mqtt::{Decodable, Encodable, QualityOfService};
 
 const KEEP_ALIVE: u16 = 10;
 
@@ -15,6 +16,7 @@ pub fn connect(
   username: String,
   password: String,
   client_id: String,
+  topic: &String,
 ) -> net::TcpStream {
   info!("Connecting to {:?} ... ", broker_addr);
   let mut stream = net::TcpStream::connect(broker_addr).unwrap();
@@ -36,6 +38,41 @@ pub fn connect(
       "Failed to connect to server, return code {:?}",
       connack.connect_return_code()
     );
+  }
+
+  let channel_filters: Vec<(TopicFilter, QualityOfService)> = vec![(
+    TopicFilter::new("hello/me").unwrap(),
+    QualityOfService::Level0,
+  )];
+  info!("Applying channel filters {:?} ...", channel_filters);
+  let sub = SubscribePacket::new(10, channel_filters);
+  let mut buf = Vec::new();
+  sub.encode(&mut buf).unwrap();
+  stream.write_all(&buf[..]).unwrap();
+
+  loop {
+    let packet = match VariablePacket::decode(&mut stream) {
+      Ok(pk) => pk,
+      Err(err) => {
+        warn!("Error in receiving packet {:?}", err);
+        continue;
+      }
+    };
+    info!("PACKET {:?}", packet);
+
+    if let VariablePacket::SubackPacket(ref ack) = packet {
+      if ack.packet_identifier() != 10 {
+        panic!("SUBACK packet identifier not match");
+      }
+
+      info!("Subscribed!");
+
+      let msg = format!("hello");
+      println!("Sending message '{}' to topic: '{}'", msg, "hello");
+      publish(&mut stream, msg, topic.to_string());
+      info!("Test publish!");
+      break;
+    }
   }
 
   stream

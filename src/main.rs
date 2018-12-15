@@ -68,6 +68,7 @@ fn main() {
     settings.mqtt.username,
     settings.mqtt.password,
     settings.mqtt.client_id,
+    &settings.mqtt.topic,
   );
 
   mqtt_lib::publish(&mut stream, "Hai".to_string(), settings.mqtt.topic);
