@@ -58,7 +58,7 @@ fn main() {
     env::var_os("RUST_LOG").unwrap_or_else(|| "info".into()),
   );
   env_logger::init();
-  utils::print_type_of(&"foo");
+  println!("{:?}", utils::get_unique_name().unwrap());
 
   const CONFIG_FILENAME: &'static str = "config.toml";
   let mut f = File::open(CONFIG_FILENAME).expect(&format!(
