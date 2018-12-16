@@ -26,7 +26,7 @@ mod model;
 use model::hero::Hero;
 
 mod libs;
-use libs::type_info::print_type_of;
+use libs::utils;
 
 #[get("/hello")]
 fn hello() -> &'static str {
@@ -58,7 +58,7 @@ fn main() {
     env::var_os("RUST_LOG").unwrap_or_else(|| "info".into()),
   );
   env_logger::init();
-  print_type_of(&"foo");
+  utils::print_type_of(&"foo");
 
   const CONFIG_FILENAME: &'static str = "config.toml";
   let mut f = File::open(CONFIG_FILENAME).expect(&format!(
