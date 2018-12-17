@@ -15,8 +15,6 @@ extern crate mqtt;
 mod config;
 use config::read_config;
 
-mod mqtt_lib;
-
 use std::env;
 use std::fs::File;
 use std::thread;
@@ -27,6 +25,7 @@ mod model;
 use model::hero::Hero;
 
 mod libs;
+use libs::mqtt_lib;
 use libs::utils;
 
 #[get("/hello")]
