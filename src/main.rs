@@ -19,6 +19,7 @@ mod mqtt_lib;
 
 use std::env;
 use std::fs::File;
+use std::thread;
 
 use rocket_contrib::json::Json;
 
@@ -78,6 +79,8 @@ fn main() {
   mqtt_lib::publish(&mut stream, "Hai".to_string(), settings.mqtt.topic);
 
   info!("Hai from log");
+
+  let _listen = thread::spawn(move || mqtt_lib::mqtt_subscribe_worker(stream));
   rocket::ignite()
     .mount("/", routes![hello])
     .mount("/status", routes![am_i_up])

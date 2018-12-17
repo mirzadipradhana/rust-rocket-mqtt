@@ -1,7 +1,11 @@
 extern crate mqtt;
+extern crate time;
 
 use std::io::Write;
 use std::net;
+use std::str;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use mqtt::control::variable_header::ConnectReturnCode;
 use mqtt::packet::*;
@@ -10,6 +14,56 @@ use mqtt::TopicName;
 use mqtt::{Decodable, Encodable, QualityOfService};
 
 const KEEP_ALIVE: u16 = 10;
+
+pub fn mqtt_subscribe_worker(mut stream: net::TcpStream) {
+  let mut stream_clone = stream.try_clone().unwrap();
+  thread::spawn(move || loop {
+    let mut last_ping_time = 0;
+    let mut next_ping_time = last_ping_time + (KEEP_ALIVE as f32 * 0.9) as i64;
+    let current_timestamp = time::get_time().sec;
+    if KEEP_ALIVE > 0 && current_timestamp >= next_ping_time {
+      info!("Sending PINGREQ to broker");
+
+      let pingreq_packet = PingreqPacket::new();
+
+      let mut buf = Vec::new();
+      pingreq_packet.encode(&mut buf).unwrap();
+      stream_clone.write_all(&buf[..]).unwrap();
+
+      last_ping_time = current_timestamp;
+      next_ping_time = last_ping_time + (KEEP_ALIVE as f32 * 0.9) as i64;
+      thread::sleep(Duration::new((KEEP_ALIVE / 2) as u64, 0));
+    }
+  });
+
+  loop {
+    let packet = match VariablePacket::decode(&mut stream) {
+      Ok(pk) => pk,
+      Err(err) => {
+        error!("Error in receiving packet {}", err);
+        continue;
+      }
+    };
+    trace!("PACKET {:?}", packet);
+
+    match packet {
+      VariablePacket::PingrespPacket(..) => {
+        info!("Receiving PINGRESP from broker ..");
+      }
+      VariablePacket::PublishPacket(ref publ) => {
+        let msg = match str::from_utf8(&publ.payload_ref()[..]) {
+          Ok(msg) => msg,
+          Err(err) => {
+            error!("Failed to decode publish message {:?}", err);
+            continue;
+          }
+        };
+        info!("PUBLISH ({}): {}", publ.topic_name(), msg);
+      }
+      _ => {}
+    }
+  }
+}
 
 pub fn connect(
   broker_addr: String,
