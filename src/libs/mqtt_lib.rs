@@ -15,7 +15,7 @@ use mqtt::{Decodable, Encodable, QualityOfService};
 
 const KEEP_ALIVE: u16 = 10;
 
-pub fn mqtt_subscribe_worker(mut stream: &mut net::TcpStream) {
+pub fn mqtt_subscribe_listener(mut stream: &mut net::TcpStream) {
   let mut stream_clone = stream.try_clone().unwrap();
   thread::spawn(move || loop {
     let mut last_ping_time = 0;
