@@ -1,6 +1,9 @@
+extern crate futures;
 extern crate mqtt;
 extern crate time;
+extern crate tokio;
 
+use std::fmt::Debug;
 use std::io::Write;
 use std::net;
 use std::str;
@@ -13,56 +16,70 @@ use mqtt::topic_filter::TopicFilter;
 use mqtt::TopicName;
 use mqtt::{Decodable, Encodable, QualityOfService};
 
+use tokio::io::{self, AsyncRead};
+use tokio::net::TcpStream;
+use tokio::timer::Interval;
+
+use futures::{future, Future, Stream};
+
 const KEEP_ALIVE: u16 = 10;
 
-pub fn mqtt_subscribe_listener(mut stream: &mut net::TcpStream) {
-  let mut stream_clone = stream.try_clone().unwrap();
-  thread::spawn(move || loop {
-    let mut last_ping_time = 0;
-    let mut next_ping_time = last_ping_time + (KEEP_ALIVE as f32 * 0.9) as i64;
-    let current_timestamp = time::get_time().sec;
-    if KEEP_ALIVE > 0 && current_timestamp >= next_ping_time {
-      info!("Sending PINGREQ to broker");
+fn alt_drop<E: Debug>(err: E) {
+  warn!("{:?}", err);
+}
 
-      let pingreq_packet = PingreqPacket::new();
+pub fn mqtt_subscribe_listener(stream: net::TcpStream) {
+  // connection made, start the async work
+  let program = future::ok(()).and_then(move |()| {
+    let stream = TcpStream::from_std(stream, &Default::default()).unwrap();
+    let (mqtt_read, mqtt_write) = stream.split();
 
-      let mut buf = Vec::new();
-      pingreq_packet.encode(&mut buf).unwrap();
-      stream_clone.write_all(&buf[..]).unwrap();
+    let ping_time = Duration::new((KEEP_ALIVE / 2) as u64, 0);
+    let ping_stream = Interval::new(Instant::now() + ping_time, ping_time);
 
-      last_ping_time = current_timestamp;
-      next_ping_time = last_ping_time + (KEEP_ALIVE as f32 * 0.9) as i64;
-      thread::sleep(Duration::new((KEEP_ALIVE / 2) as u64, 0));
-    }
+    let ping_sender = ping_stream
+      .map_err(alt_drop)
+      .fold(mqtt_write, |mqtt_write, _| {
+        info!("Sending PINGREQ to broker");
+
+        let pingreq_packet = PingreqPacket::new();
+
+        let mut buf = Vec::new();
+        pingreq_packet.encode(&mut buf).unwrap();
+        io::write_all(mqtt_write, buf)
+          .map(|(mqtt_write, _buf)| mqtt_write)
+          .map_err(alt_drop)
+      });
+
+    let receiver = future::loop_fn::<_, (), _, _>(mqtt_read, |mqtt_read| {
+      VariablePacket::parse(mqtt_read).map(|(mqtt_read, packet)| {
+        trace!("PACKET {:?}", packet);
+
+        match packet {
+          VariablePacket::PingrespPacket(..) => {
+            info!("Receiving PINGRESP from broker ..");
+          }
+          VariablePacket::PublishPacket(ref publ) => {
+            let msg = match str::from_utf8(&publ.payload_ref()[..]) {
+              Ok(msg) => msg,
+              Err(err) => {
+                error!("Failed to decode publish message {:?}", err);
+                return future::Loop::Continue(mqtt_read);
+              }
+            };
+            info!("PUBLISH ({}): {}", publ.topic_name(), msg);
+          }
+          _ => {}
+        }
+
+        future::Loop::Continue(mqtt_read)
+      })
+    }).map_err(alt_drop);
+
+    ping_sender.join(receiver).map(alt_drop)
   });
 
-  loop {
-    let packet = match VariablePacket::decode(&mut stream) {
-      Ok(pk) => pk,
-      Err(err) => {
-        error!("Error in receiving packet {}", err);
-        continue;
-      }
-    };
-    trace!("PACKET {:?}", packet);
-
-    match packet {
-      VariablePacket::PingrespPacket(..) => {
-        info!("Receiving PINGRESP from broker ..");
-      }
-      VariablePacket::PublishPacket(ref publ) => {
-        let msg = match str::from_utf8(&publ.payload_ref()[..]) {
-          Ok(msg) => msg,
-          Err(err) => {
-            error!("Failed to decode publish message {:?}", err);
-            continue;
-          }
-        };
-        info!("PUBLISH ({}): {}", publ.topic_name(), msg);
-      }
-      _ => {}
-    }
-  }
+  tokio::run(program);
 }
 
 pub fn connect(

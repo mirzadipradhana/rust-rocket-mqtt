@@ -13,6 +13,8 @@ extern crate env_logger;
 extern crate mqtt;
 #[macro_use]
 extern crate lazy_static;
+extern crate futures;
+extern crate tokio;
 
 mod config;
 use config::{read_config, Config};
@@ -98,8 +100,9 @@ fn main() {
     settings.mqtt.topic,
   );
 
-  let _listen =
-    thread::spawn(move || mqtt_lib::mqtt_subscribe_listener(&mut MQTT_STREAMS.lock().unwrap()[0]));
+  let _listen = thread::spawn(move || {
+    mqtt_lib::mqtt_subscribe_listener(MQTT_STREAMS.lock().unwrap()[0].try_clone().unwrap())
+  });
   rocket::ignite()
     .mount("/", routes![hello])
     .mount("/status", routes![am_i_up])
