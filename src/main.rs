@@ -96,6 +96,7 @@ fn main() {
 
   let settings = parse_config();
 
+  // subscribe tcpstream
   MQTT_STREAMS.lock().unwrap().push(mqtt_lib::connect(
     CONFIG.mqtt.broker_address.clone(),
     CONFIG.mqtt.username.clone(),
@@ -104,6 +105,7 @@ fn main() {
     &CONFIG.mqtt.topic.clone(),
   ));
 
+  // publish tcpstream
   MQTT_STREAMS.lock().unwrap().push(mqtt_lib::connect(
     CONFIG.mqtt.broker_address.clone(),
     CONFIG.mqtt.username.clone(),
