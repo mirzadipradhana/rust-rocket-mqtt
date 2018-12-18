@@ -63,6 +63,16 @@ fn heroes() -> Json<Hero> {
   Json(data)
 }
 
+#[get("/broadcast/<msg>")]
+fn publish(msg: String) -> &'static str {
+  mqtt_lib::publish(
+    &mut MQTT_STREAMS.lock().unwrap()[1].try_clone().unwrap(),
+    msg.to_string(),
+    CONFIG.mqtt.topic.clone(),
+  );
+  "OK"
+}
+
 fn parse_config() -> Config {
   const CONFIG_FILENAME: &'static str = "config.toml";
   let mut f = File::open(CONFIG_FILENAME).expect(&format!(
@@ -87,15 +97,23 @@ fn main() {
   let settings = parse_config();
 
   MQTT_STREAMS.lock().unwrap().push(mqtt_lib::connect(
-    settings.mqtt.broker_address,
-    settings.mqtt.username,
-    settings.mqtt.password,
-    settings.mqtt.client_id,
-    &settings.mqtt.topic,
+    CONFIG.mqtt.broker_address.clone(),
+    CONFIG.mqtt.username.clone(),
+    CONFIG.mqtt.password.clone(),
+    CONFIG.mqtt.client_id.clone(),
+    &CONFIG.mqtt.topic.clone(),
+  ));
+
+  MQTT_STREAMS.lock().unwrap().push(mqtt_lib::connect(
+    CONFIG.mqtt.broker_address.clone(),
+    CONFIG.mqtt.username.clone(),
+    CONFIG.mqtt.password.clone(),
+    CONFIG.mqtt.client_id.clone(),
+    &CONFIG.mqtt.topic.clone(),
   ));
 
   mqtt_lib::publish(
-    &mut MQTT_STREAMS.lock().unwrap()[0],
+    &mut MQTT_STREAMS.lock().unwrap()[1],
     "Hai hoo".to_string(),
     settings.mqtt.topic,
   );
@@ -107,5 +125,6 @@ fn main() {
     .mount("/", routes![hello])
     .mount("/status", routes![am_i_up])
     .mount("/heroes", routes![heroes])
+    .mount("/publish", routes![publish])
     .launch();
 }
