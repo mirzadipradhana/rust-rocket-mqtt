@@ -98,9 +98,8 @@ fn main() {
     settings.mqtt.topic,
   );
 
-  info!("Hai from log");
-
-  // let _listen = thread::spawn(move || mqtt_lib::mqtt_subscribe_worker(stream));
+  let _listen =
+    thread::spawn(move || mqtt_lib::mqtt_subscribe_worker(&mut MQTT_STREAMS.lock().unwrap()[0]));
   rocket::ignite()
     .mount("/", routes![hello])
     .mount("/status", routes![am_i_up])
