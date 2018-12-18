@@ -13,7 +13,7 @@ extern crate env_logger;
 extern crate mqtt;
 
 mod config;
-use config::read_config;
+use config::{read_config, Config};
 
 use std::env;
 use std::fs::File;
@@ -52,6 +52,15 @@ fn heroes() -> Json<Hero> {
   Json(data)
 }
 
+fn parse_config() -> Config {
+  const CONFIG_FILENAME: &'static str = "config.toml";
+  let mut f = File::open(CONFIG_FILENAME).expect(&format!(
+    "Can't open configuration file: {}",
+    CONFIG_FILENAME
+  ));
+  read_config(&mut f).expect("Can't read configuration file.")
+}
+
 fn main() {
   env::set_var(
     "RUST_LOG",
@@ -60,12 +69,7 @@ fn main() {
   env_logger::init();
   println!("{:?}", utils::get_unique_name().unwrap());
 
-  const CONFIG_FILENAME: &'static str = "config.toml";
-  let mut f = File::open(CONFIG_FILENAME).expect(&format!(
-    "Can't open configuration file: {}",
-    CONFIG_FILENAME
-  ));
-  let settings = read_config(&mut f).expect("Can't read configuration file.");
+  let settings = parse_config();
 
   let mut stream = mqtt_lib::connect(
     settings.mqtt.broker_address,
