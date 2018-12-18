@@ -11,12 +11,16 @@ extern crate serde_derive;
 extern crate log;
 extern crate env_logger;
 extern crate mqtt;
+#[macro_use]
+extern crate lazy_static;
 
 mod config;
 use config::{read_config, Config};
 
 use std::env;
 use std::fs::File;
+use std::net::TcpStream;
+use std::sync::Mutex;
 use std::thread;
 
 use rocket_contrib::json::Json;
@@ -25,8 +29,12 @@ mod model;
 use model::hero::Hero;
 
 mod libs;
-use libs::mqtt_lib;
-use libs::utils;
+use libs::{mqtt_lib, utils};
+
+lazy_static! {
+  static ref CONFIG: Config = parse_config();
+  static ref MQTT_STREAMS: Mutex<Vec<TcpStream>> = Mutex::new(vec![]);
+}
 
 #[get("/hello")]
 fn hello() -> &'static str {
@@ -35,6 +43,7 @@ fn hello() -> &'static str {
 
 #[get("/am-i-up")]
 fn am_i_up() -> &'static str {
+  hai();
   "OK"
 }
 
@@ -61,6 +70,10 @@ fn parse_config() -> Config {
   read_config(&mut f).expect("Can't read configuration file.")
 }
 
+fn hai() {
+  info!("Hai");
+}
+
 fn main() {
   env::set_var(
     "RUST_LOG",
@@ -71,19 +84,23 @@ fn main() {
 
   let settings = parse_config();
 
-  let mut stream = mqtt_lib::connect(
+  MQTT_STREAMS.lock().unwrap().push(mqtt_lib::connect(
     settings.mqtt.broker_address,
     settings.mqtt.username,
     settings.mqtt.password,
     settings.mqtt.client_id,
     &settings.mqtt.topic,
-  );
+  ));
 
-  mqtt_lib::publish(&mut stream, "Hai".to_string(), settings.mqtt.topic);
+  mqtt_lib::publish(
+    &mut MQTT_STREAMS.lock().unwrap()[0],
+    "Hai hoo".to_string(),
+    settings.mqtt.topic,
+  );
 
   info!("Hai from log");
 
-  let _listen = thread::spawn(move || mqtt_lib::mqtt_subscribe_worker(stream));
+  // let _listen = thread::spawn(move || mqtt_lib::mqtt_subscribe_worker(stream));
   rocket::ignite()
     .mount("/", routes![hello])
     .mount("/status", routes![am_i_up])
